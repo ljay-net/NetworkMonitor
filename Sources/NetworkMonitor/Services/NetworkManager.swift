@@ -14,7 +14,8 @@ class NetworkManager: NSObject, ObservableObject {
     private var netServiceBrowser: NetServiceBrowser?
     private var discoveredServices = [NetService]()
     
-    init() {
+    override init() {
+        super.init()
         loadSavedDevices()
         determineLocalIP()
     }
