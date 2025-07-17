@@ -3,7 +3,7 @@ import Network
 import SystemConfiguration
 import UserNotifications
 
-class NetworkManager: ObservableObject {
+class NetworkManager: NSObject, ObservableObject {
     @Published var devices: [NetworkDevice] = []
     @Published var newDeviceDetected: NetworkDevice?
     @Published var missingImportantDevice: NetworkDevice?

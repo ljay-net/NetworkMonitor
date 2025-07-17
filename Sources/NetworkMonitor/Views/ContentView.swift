@@ -196,7 +196,7 @@ struct ContentView: View {
         .fileExporter(
             isPresented: $showingExportPanel,
             document: ExportedDocument(data: exportData ?? Data()),
-            contentType: UTType(exportUTI),
+            contentType: UTType(exportUTI)!,
             defaultFilename: exportFilename
         ) { result in
             switch result {
@@ -261,7 +261,7 @@ struct ContentView: View {
         }
     }
 }
-}
+
 extension DeviceFilter {
     func isSameFilter(as other: DeviceFilter) -> Bool {
         switch (self, other) {

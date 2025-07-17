@@ -50,7 +50,7 @@ struct NetworkMapView: View {
                 // Connection lines
                 if animateConnections {
                     ForEach(devicesToShow.filter { $0.type != .router }) { device in
-                        if let router = networkManager.devices.first(where: { $0.type == .router }) {
+                        if networkManager.devices.contains(where: { $0.type == .router }) {
                             ConnectionLine(from: .zero, to: positionForDevice(device, in: devicesToShow))
                         }
                     }
