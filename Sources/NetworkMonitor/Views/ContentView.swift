@@ -24,7 +24,6 @@ struct ContentView: View {
     @State private var showingExportPanel = false
     @State private var exportData: Data?
     @State private var exportFilename = ""
-    @State private var exportUTI = ""
     @State private var currentFilter: DeviceFilter = .all
     
     var body: some View {
@@ -196,7 +195,7 @@ struct ContentView: View {
         .fileExporter(
             isPresented: $showingExportPanel,
             document: ExportedDocument(data: exportData ?? Data()),
-            contentType: UTType(exportUTI)!,
+            contentType: UTType.commaSeparatedText,
             defaultFilename: exportFilename
         ) { result in
             switch result {
@@ -217,11 +216,9 @@ struct ContentView: View {
             let csvString = DataExporter.exportDevicesToCSV(devicesToExport)
             exportData = csvString.data(using: .utf8)
             exportFilename = "network_devices.csv"
-            exportUTI = "public.comma-separated-values-text"
         case .json:
             exportData = DataExporter.exportDevicesToJSON(devicesToExport)
             exportFilename = "network_devices.json"
-            exportUTI = "public.json"
         }
         
         showingExportPanel = true
