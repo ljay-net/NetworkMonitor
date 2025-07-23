@@ -1,5 +1,4 @@
 import Foundation
-import Process
 
 class ARPScanner {
     static func scanARPTable() -> [(ipAddress: String, macAddress: String)] {
