@@ -5,6 +5,7 @@ struct DebugConsoleView: View {
     @State private var filterText = ""
     @State private var selectedLevel: DebugLogger.LogLevel? = nil
     @State private var autoScroll = true
+    @Binding var isVisible: Bool
     
     var body: some View {
         VStack {
@@ -14,10 +15,17 @@ struct DebugConsoleView: View {
                 
                 Spacer()
                 
-                Button(action: { logger.clear() }) {
-                    Label("Clear", systemImage: "trash")
+                HStack {
+                    Button(action: { logger.clear() }) {
+                        Label("Clear", systemImage: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    
+                    Button(action: { isVisible = false }) {
+                        Label("Close", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
             }
             .padding(.horizontal)
             
@@ -75,7 +83,10 @@ struct DebugConsoleView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 300)
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(15, corners: [.topLeft, .topRight])
+        .shadow(radius: 5)
     }
     
     private var filteredLogs: [DebugLogger.LogEntry] {
@@ -86,3 +97,6 @@ struct DebugConsoleView: View {
         }
     }
 }
+    init(isVisible: Binding<Bool>) {
+        self._isVisible = isVisible
+    }

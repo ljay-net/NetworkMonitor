@@ -212,8 +212,13 @@ struct ContentView: View {
                 DebugLogger.shared.error("Export error: \(error.localizedDescription)")
             }
         }
-        .sheet(isPresented: $showingDebugConsole) {
-            DebugConsoleView()
+        .overlay(alignment: .bottom) {
+            if showingDebugConsole {
+                DebugConsoleView(isVisible: $showingDebugConsole)
+                    .frame(height: 300)
+                    .transition(.move(edge: .bottom))
+                    .animation(.spring(), value: showingDebugConsole)
+            }
         }
     }
     
