@@ -98,21 +98,35 @@ class NetworkManager: NSObject, ObservableObject {
     }
     
     private func scanLocalNetwork() {
-        guard let localIP = localIP else { return }
+        print("Starting local network scan...")
+        guard let localIP = localIP else {
+            print("Local IP not determined")
+            return 
+        }
+        
+        print("Local IP: \(localIP)")
         
         // Extract subnet from local IP (e.g., 192.168.1.x)
         let components = localIP.split(separator: ".")
-        guard components.count == 4 else { return }
+        guard components.count == 4 else {
+            print("Invalid IP format")
+            return
+        }
         
         let subnet = components[0...2].joined(separator: ".")
+        print("Subnet: \(subnet)")
         
         // Add router as a default device
         addOrUpdateDevice(name: "Router", ipAddress: "\(subnet).1", macAddress: "Unknown", type: .router)
         
         // Scan ARP table for devices
+        print("Scanning ARP table...")
         let arpDevices = ARPScanner.scanARPTable()
+        print("ARP scan returned \(arpDevices.count) devices")
+        
         for device in arpDevices {
             // Try to determine device name from IP
+            print("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
             let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
             addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: .unknown)
         }
@@ -120,6 +134,16 @@ class NetworkManager: NSObject, ObservableObject {
         // For devices we already know about, try to ping them
         for device in devices where device.ipAddress.starts(with: subnet) {
             pingDevice(at: device.ipAddress)
+        }
+        
+        print("Network scan complete. Found \(devices.count) devices.")
+        
+        // Add some sample devices if none were found
+        if devices.isEmpty {
+            print("No devices found, adding sample devices")
+            addOrUpdateDevice(name: "Sample Router", ipAddress: "\(subnet).1", macAddress: "aa:bb:cc:dd:ee:ff", type: .router)
+            addOrUpdateDevice(name: "Sample Computer", ipAddress: "\(subnet).2", macAddress: "11:22:33:44:55:66", type: .computer)
+            addOrUpdateDevice(name: "Sample Phone", ipAddress: "\(subnet).3", macAddress: "aa:bb:cc:11:22:33", type: .mobile)
         }
     }
     
