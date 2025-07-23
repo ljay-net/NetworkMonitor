@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var showingExportPanel = false
     @State private var exportData: Data?
     @State private var exportFilename = ""
+    @State private var showingDebugConsole = false
     @State private var currentFilter: DeviceFilter = .all
     
     var body: some View {
@@ -151,6 +152,12 @@ struct ContentView: View {
                         Label("Export", systemImage: "square.and.arrow.up")
                     }
                 }
+                
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { showingDebugConsole.toggle() }) {
+                        Label("Debug Console", systemImage: "terminal")
+                    }
+                }
             }
             
             if let device = selectedDevice {
@@ -200,10 +207,13 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let url):
-                print("Saved to \(url)")
+                DebugLogger.shared.info("Exported data to \(url)")
             case .failure(let error):
-                print("Error: \(error.localizedDescription)")
+                DebugLogger.shared.error("Export error: \(error.localizedDescription)")
             }
+        }
+        .sheet(isPresented: $showingDebugConsole) {
+            DebugConsoleView()
         }
     }
     

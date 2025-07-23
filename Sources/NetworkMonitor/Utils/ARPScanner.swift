@@ -4,7 +4,7 @@ class ARPScanner {
     static func scanARPTable() -> [(ipAddress: String, macAddress: String)] {
         var results: [(ipAddress: String, macAddress: String)] = []
         
-        print("Starting ARP table scan...")
+        DebugLogger.shared.info("Starting ARP table scan...")
         
         let task = Process()
         task.launchPath = "/usr/sbin/arp"
@@ -18,16 +18,16 @@ class ARPScanner {
             
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8) {
-                print("ARP output received: \n\(output)")
+                DebugLogger.shared.debug("ARP output received: \n\(output)")
                 results = parseARPOutput(output)
-                print("Found \(results.count) devices in ARP table")
+                DebugLogger.shared.info("Found \(results.count) devices in ARP table")
             } else {
-                print("Failed to decode ARP output")
+                DebugLogger.shared.error("Failed to decode ARP output")
             }
             
             task.waitUntilExit()
         } catch {
-            print("Error executing arp command: \(error.localizedDescription)")
+            DebugLogger.shared.error("Error executing arp command: \(error.localizedDescription)")
         }
         
         return results
@@ -59,7 +59,7 @@ class ARPScanner {
             
             // Skip incomplete entries and broadcast addresses
             if macAddress != "(incomplete)" && macAddress != "ff:ff:ff:ff:ff:ff" {
-                print("Found device: \(ipAddress) with MAC: \(macAddress)")
+                DebugLogger.shared.debug("Found device: \(ipAddress) with MAC: \(macAddress)")
                 results.append((ipAddress: ipAddress, macAddress: macAddress))
             }
         }

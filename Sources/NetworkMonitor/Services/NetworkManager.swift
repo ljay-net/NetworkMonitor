@@ -21,6 +21,8 @@ class NetworkManager: NSObject, ObservableObject {
     }
     
     func scanNetwork() {
+        DebugLogger.shared.info("Starting network scan...")
+        
         // Load saved devices first
         loadSavedDevices()
         
@@ -49,6 +51,7 @@ class NetworkManager: NSObject, ObservableObject {
         // Set scanning to false after a delay to allow async operations to complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.isScanning = false
+            DebugLogger.shared.info("Network scan completed")
         }
     }
     
@@ -98,35 +101,35 @@ class NetworkManager: NSObject, ObservableObject {
     }
     
     private func scanLocalNetwork() {
-        print("Starting local network scan...")
+        DebugLogger.shared.info("Starting local network scan...")
         guard let localIP = localIP else {
-            print("Local IP not determined")
+            DebugLogger.shared.error("Local IP not determined")
             return 
         }
         
-        print("Local IP: \(localIP)")
+        DebugLogger.shared.info("Local IP: \(localIP)")
         
         // Extract subnet from local IP (e.g., 192.168.1.x)
         let components = localIP.split(separator: ".")
         guard components.count == 4 else {
-            print("Invalid IP format")
+            DebugLogger.shared.error("Invalid IP format")
             return
         }
         
         let subnet = components[0...2].joined(separator: ".")
-        print("Subnet: \(subnet)")
+        DebugLogger.shared.info("Subnet: \(subnet)")
         
         // Add router as a default device
         addOrUpdateDevice(name: "Router", ipAddress: "\(subnet).1", macAddress: "Unknown", type: .router)
         
         // Scan ARP table for devices
-        print("Scanning ARP table...")
+        DebugLogger.shared.info("Scanning ARP table...")
         let arpDevices = ARPScanner.scanARPTable()
-        print("ARP scan returned \(arpDevices.count) devices")
+        DebugLogger.shared.info("ARP scan returned \(arpDevices.count) devices")
         
         for device in arpDevices {
             // Try to determine device name from IP
-            print("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
+            DebugLogger.shared.debug("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
             let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
             addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: .unknown)
         }
@@ -136,11 +139,11 @@ class NetworkManager: NSObject, ObservableObject {
             pingDevice(at: device.ipAddress)
         }
         
-        print("Network scan complete. Found \(devices.count) devices.")
+        DebugLogger.shared.info("Network scan complete. Found \(devices.count) devices.")
         
         // Add some sample devices if none were found
         if devices.isEmpty {
-            print("No devices found, adding sample devices")
+            DebugLogger.shared.warning("No devices found, adding sample devices")
             addOrUpdateDevice(name: "Sample Router", ipAddress: "\(subnet).1", macAddress: "aa:bb:cc:dd:ee:ff", type: .router)
             addOrUpdateDevice(name: "Sample Computer", ipAddress: "\(subnet).2", macAddress: "11:22:33:44:55:66", type: .computer)
             addOrUpdateDevice(name: "Sample Phone", ipAddress: "\(subnet).3", macAddress: "aa:bb:cc:11:22:33", type: .mobile)
