@@ -7,6 +7,10 @@ struct DebugConsoleView: View {
     @State private var autoScroll = true
     @Binding var isVisible: Bool
     
+    init(isVisible: Binding<Bool>) {
+        self._isVisible = isVisible
+    }
+    
     var body: some View {
         VStack {
             HStack {
@@ -84,8 +88,8 @@ struct DebugConsoleView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .cornerRadius(15, corners: [.topLeft, .topRight])
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(15)
         .shadow(radius: 5)
     }
     
