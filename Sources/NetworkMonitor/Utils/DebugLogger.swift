@@ -17,6 +17,10 @@ class DebugLogger: ObservableObject {
             formatter.dateFormat = "HH:mm:ss.SSS"
             return formatter.string(from: timestamp)
         }
+        
+        static func == (lhs: LogEntry, rhs: LogEntry) -> Bool {
+            return lhs.id == rhs.id
+        }
     }
     
     enum LogLevel: String {
@@ -62,6 +66,3 @@ class DebugLogger: ObservableObject {
         logs.removeAll()
     }
 }
-    static func == (lhs: LogEntry, rhs: LogEntry) -> Bool {
-        return lhs.id == rhs.id
-    }
