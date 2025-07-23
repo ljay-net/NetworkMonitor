@@ -109,10 +109,49 @@ class NetworkManager: NSObject, ObservableObject {
         // Add router as a default device
         addOrUpdateDevice(name: "Router", ipAddress: "\(subnet).1", macAddress: "Unknown", type: .router)
         
+        // Scan ARP table for devices
+        let arpDevices = ARPScanner.scanARPTable()
+        for device in arpDevices {
+            // Try to determine device name from IP
+            let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
+            addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: .unknown)
+        }
+        
         // For devices we already know about, try to ping them
         for device in devices where device.ipAddress.starts(with: subnet) {
             pingDevice(at: device.ipAddress)
         }
+    }
+    
+    private func getDeviceNameFromIP(_ ipAddress: String) -> String? {
+        let task = Process()
+        task.launchPath = "/usr/bin/host"
+        task.arguments = [ipAddress]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        
+        do {
+            try task.run()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                // Parse hostname from output
+                if let nameRange = output.range(of: "domain name pointer ([^\\s\\.]+)", options: .regularExpression) {
+                    let nameWithPrefix = String(output[nameRange])
+                    let nameComponents = nameWithPrefix.components(separatedBy: " ")
+                    if nameComponents.count > 2 {
+                        return nameComponents[2]
+                    }
+                }
+            }
+            
+            task.waitUntilExit()
+        } catch {
+            print("Error executing host command: \(error.localizedDescription)")
+        }
+        
+        return nil
     }
     
     private func pingDevice(at ipAddress: String) {
