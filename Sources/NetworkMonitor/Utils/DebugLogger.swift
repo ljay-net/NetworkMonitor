@@ -6,7 +6,7 @@ class DebugLogger: ObservableObject {
     @Published var logs: [LogEntry] = []
     @Published var isEnabled = true
     
-    struct LogEntry: Identifiable {
+    struct LogEntry: Identifiable, Equatable {
         let id = UUID()
         let timestamp: Date
         let message: String
@@ -62,3 +62,6 @@ class DebugLogger: ObservableObject {
         logs.removeAll()
     }
 }
+    static func == (lhs: LogEntry, rhs: LogEntry) -> Bool {
+        return lhs.id == rhs.id
+    }
