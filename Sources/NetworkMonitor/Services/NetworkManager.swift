@@ -529,14 +529,15 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
             if macLower.hasPrefix(prefix) {
                 DebugLogger.shared.debug("Identified potential router from MAC prefix: \(prefix)")
                 // We'll be more cautious about identifying routers
-                // Let's check if this is the default gateway before classifying as router
+                // Just identify as router based on MAC prefix
+                // We'll be more selective about this in the main device processing
+                DebugLogger.shared.debug("Identified router from MAC prefix: \(prefix)")
+                return .router
+                /* Removed gateway check as we don't have access to devices list here
                 if let gateway = findDefaultGateway(), 
-                   let routerIP = devices.first(where: { $0.macAddress.lowercased() == macLower })?.ipAddress,
-                   gateway == routerIP {
-                    return .router
-                }
-                // Otherwise, default to unknown
-                return .unknown
+                   gateway == someIP {
+                */
+                // This code is now unreachable due to the fix above
             }
         }
         
