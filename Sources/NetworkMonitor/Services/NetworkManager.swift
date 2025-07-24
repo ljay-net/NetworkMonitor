@@ -535,7 +535,9 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         // Use the vendor information to guess the device type
         if !oui.isEmpty {
             let vendor = MacVendorDatabase.shared.lookupVendor(forMac: oui)
-            return inferDeviceTypeFromVendor(vendor)
+            if let vendor = vendor {
+                return inferDeviceTypeFromVendor(vendor)
+            }
         }
         
         return .unknown
