@@ -153,36 +153,43 @@ class NetworkManager: NSObject, ObservableObject {
         let arpDevices = ARPScanner.scanARPTable()
         DebugLogger.shared.info("ARP scan returned \(arpDevices.count) devices")
         
-        // Find the router MAC address
-        var routerMAC = "Unknown"
-        let routerIP = "\(subnet).1"
+        // Find the default gateway IP and MAC
+        let gatewayIP = findDefaultGateway() ?? "\(subnet).1"
+        DebugLogger.shared.info("Using gateway IP: \(gatewayIP)")
         
         // Debug all found devices
         for device in arpDevices {
             DebugLogger.shared.debug("ARP device: IP=\(device.ipAddress), MAC=\(device.macAddress)")
         }
         
-        // Try to find router by IP
-        if let routerDevice = arpDevices.first(where: { $0.ipAddress == routerIP }) {
-            routerMAC = routerDevice.macAddress
+        // Try to find router by gateway IP
+        var routerMAC = "Unknown"
+        if let gatewayDevice = arpDevices.first(where: { $0.ipAddress == gatewayIP }) {
+            routerMAC = gatewayDevice.macAddress
             DebugLogger.shared.info("Found router MAC address: \(routerMAC)")
-        } else {
-            DebugLogger.shared.warning("Router not found in ARP table at expected IP \(routerIP)")
             
-            // Try to find the default gateway
-            let gatewayIP = findDefaultGateway()
-            if let gatewayIP = gatewayIP, let gatewayDevice = arpDevices.first(where: { $0.ipAddress == gatewayIP }) {
-                routerMAC = gatewayDevice.macAddress
-                DebugLogger.shared.info("Found router MAC address from gateway: \(routerMAC)")
-            }
+            // Add router as a device - use the actual gateway IP
+            addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: routerMAC, type: .router)
+        } else {
+            DebugLogger.shared.warning("Router not found in ARP table at gateway IP \(gatewayIP)")
+            
+            // Add router with unknown MAC
+            addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: "Unknown", type: .router)
         }
         
-        // Add router as a default device
-        addOrUpdateDevice(name: "Router", ipAddress: routerIP, macAddress: routerMAC, type: .router)
+        // Remove any duplicate router entries from previous scans
+        devices = devices.filter { device in
+            if device.type == .router && device.ipAddress != gatewayIP {
+                DebugLogger.shared.debug("Removing duplicate router at \(device.ipAddress)")
+                return false
+            }
+            return true
+        }
         
+        // Process all other devices from ARP table
         for device in arpDevices {
             // Skip the router as we've already added it
-            if device.ipAddress == routerIP {
+            if device.ipAddress == gatewayIP {
                 continue
             }
             
@@ -190,8 +197,28 @@ class NetworkManager: NSObject, ObservableObject {
             DebugLogger.shared.debug("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
             let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
             
-            // Try to determine device type from MAC address
-            let deviceType = inferDeviceTypeFromMAC(device.macAddress)
+            // For device type, we'll be more conservative
+            // Default to unknown unless we have strong evidence
+            var deviceType = DeviceType.unknown
+            
+            // Check if this is the local device
+            if device.ipAddress == localIP {
+                deviceType = .computer
+                DebugLogger.shared.debug("Identified local computer at \(device.ipAddress)")
+            } else {
+                // Try to determine device type from MAC address
+                // But be more selective about router classification
+                let inferredType = inferDeviceTypeFromMAC(device.macAddress)
+                
+                // Only accept router type if it's actually the gateway
+                if inferredType == .router && device.ipAddress != gatewayIP {
+                    deviceType = .unknown
+                    DebugLogger.shared.debug("Reclassified device from router to unknown: \(device.ipAddress)")
+                } else {
+                    deviceType = inferredType
+                }
+            }
+            
             addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: deviceType)
         }
         
