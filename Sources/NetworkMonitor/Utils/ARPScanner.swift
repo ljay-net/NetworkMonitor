@@ -36,31 +36,45 @@ class ARPScanner {
     private static func parseARPOutput(_ output: String) -> [(ipAddress: String, macAddress: String)] {
         var results: [(ipAddress: String, macAddress: String)] = []
         
+        DebugLogger.shared.debug("Parsing ARP output...")
+        
         let lines = output.components(separatedBy: .newlines)
         for line in lines {
             // Skip empty lines
             guard !line.isEmpty else { continue }
             
-            // Format from your output: ? (10.13.13.1) at 60:83:e7:3b:e0:8d on en1 ifscope [ethernet]
-            let components = line.components(separatedBy: " ")
+            DebugLogger.shared.debug("Processing ARP line: \(line)")
             
-            // Need at least 4 components: ? (ip) at mac
-            guard components.count >= 4 else { continue }
+            // Extract IP address - it's usually in parentheses like (10.13.13.1)
+            guard let ipRange = line.range(of: "\\([0-9\\.]+\\)") else {
+                DebugLogger.shared.debug("No IP address found in line")
+                continue
+            }
             
-            // Get IP address - format is (10.13.13.1)
-            let ipComponent = components[1]
-            let ipAddress = ipComponent.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
+            let ipWithParens = String(line[ipRange])
+            let ipAddress = ipWithParens.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
             
-            // Get MAC address - should be after "at"
-            let atIndex = components.firstIndex(of: "at")
-            guard let macIndex = atIndex, macIndex + 1 < components.count else { continue }
+            // Extract MAC address - it's usually after "at" and before "on"
+            guard let atRange = line.range(of: "at ") else {
+                DebugLogger.shared.debug("No 'at' marker found for MAC address")
+                continue
+            }
             
-            let macAddress = components[macIndex + 1]
+            let afterAt = String(line[atRange.upperBound...])
+            let macComponents = afterAt.components(separatedBy: " ")
+            guard !macComponents.isEmpty else {
+                DebugLogger.shared.debug("No MAC address found after 'at'")
+                continue
+            }
+            
+            let macAddress = macComponents[0]
             
             // Skip incomplete entries and broadcast addresses
-            if macAddress != "(incomplete)" && macAddress != "ff:ff:ff:ff:ff:ff" {
-                DebugLogger.shared.debug("Found device: \(ipAddress) with MAC: \(macAddress)")
+            if macAddress != "(incomplete)" && !macAddress.lowercased().contains("ff:ff:ff:ff:ff:ff") {
+                DebugLogger.shared.info("Found device: \(ipAddress) with MAC: \(macAddress)")
                 results.append((ipAddress: ipAddress, macAddress: macAddress))
+            } else {
+                DebugLogger.shared.debug("Skipping incomplete or broadcast MAC: \(macAddress)")
             }
         }
         

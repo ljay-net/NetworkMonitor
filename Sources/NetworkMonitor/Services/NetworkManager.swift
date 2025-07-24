@@ -56,31 +56,60 @@ class NetworkManager: NSObject, ObservableObject {
     }
     
     private func determineLocalIP() {
+        DebugLogger.shared.info("Determining local IP address...")
         var address: String?
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
         
-        guard getifaddrs(&ifaddr) == 0 else { return }
+        guard getifaddrs(&ifaddr) == 0 else { 
+            DebugLogger.shared.error("Failed to get interface addresses")
+            return 
+        }
         defer { freeifaddrs(ifaddr) }
+        
+        // Try to find interfaces in this order: en0, en1, en2, etc.
+        let interfacesToTry = ["en0", "en1", "en2", "en3", "en4", "en5", "eth0", "eth1"]
+        
+        DebugLogger.shared.debug("Searching for network interfaces: \(interfacesToTry.joined(separator: ", "))")
         
         var ptr = ifaddr
         while ptr != nil {
             defer { ptr = ptr?.pointee.ifa_next }
             
-            let interface = ptr?.pointee
-            let addrFamily = interface?.ifa_addr.pointee.sa_family
+            guard let interface = ptr?.pointee else { continue }
+            guard let addr = interface.ifa_addr else { continue }
+            
+            let addrFamily = addr.pointee.sa_family
             
             if addrFamily == UInt8(AF_INET) {  // IPv4
-                let name = String(cString: (interface?.ifa_name)!)
-                if name == "en0" {  // Wi-Fi interface on most Macs
+                let name = String(cString: interface.ifa_name)
+                DebugLogger.shared.debug("Found interface: \(name)")
+                
+                if interfacesToTry.contains(name) {
                     var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    getnameinfo(interface?.ifa_addr, socklen_t((interface?.ifa_addr.pointee.sa_len)!),
+                    getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
                                 &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
-                    address = String(cString: hostname)
+                    let potentialAddress = String(cString: hostname)
+                    
+                    // Skip loopback addresses
+                    if !potentialAddress.hasPrefix("127.") {
+                        address = potentialAddress
+                        DebugLogger.shared.info("Found valid IP address \(potentialAddress) on interface \(name)")
+                        break
+                    } else {
+                        DebugLogger.shared.debug("Skipping loopback address \(potentialAddress) on interface \(name)")
+                    }
                 }
             }
         }
         
-        localIP = address
+        if let address = address {
+            localIP = address
+            DebugLogger.shared.info("Local IP determined: \(address)")
+        } else {
+            // Fallback to a hardcoded subnet if we can't determine the IP
+            localIP = "10.13.13.100"  // Using the subnet from your ARP output
+            DebugLogger.shared.warning("Could not determine local IP, using fallback: \(localIP!)")
+        }
     }
     
     private func startBonjourDiscovery() {
