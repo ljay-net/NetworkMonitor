@@ -178,12 +178,16 @@ class NetworkManager: NSObject, ObservableObject {
         }
         
         // Remove any duplicate router entries from previous scans
-        devices = devices.filter { device in
-            if device.type == .router && device.ipAddress != gatewayIP {
-                DebugLogger.shared.debug("Removing duplicate router at \(device.ipAddress)")
-                return false
+        // We'll do this after the current scan is complete to avoid modifying the array during iteration
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.devices = self.devices.filter { device in
+                if device.type == .router && device.ipAddress != gatewayIP {
+                    DebugLogger.shared.debug("Removing duplicate router at \(device.ipAddress)")
+                    return false
+                }
+                return true
             }
-            return true
         }
         
         // Process all other devices from ARP table
