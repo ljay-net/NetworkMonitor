@@ -167,27 +167,18 @@ class NetworkManager: NSObject, ObservableObject {
         if let gatewayDevice = arpDevices.first(where: { $0.ipAddress == gatewayIP }) {
             routerMAC = gatewayDevice.macAddress
             DebugLogger.shared.info("Found router MAC address: \(routerMAC)")
-            
-            // Add router as a device - use the actual gateway IP
-            addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: routerMAC, type: .router)
         } else {
             DebugLogger.shared.warning("Router not found in ARP table at gateway IP \(gatewayIP)")
-            
-            // Add router with unknown MAC
-            addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: "Unknown", type: .router)
         }
         
-        // Remove any duplicate router entries from previous scans
-        // We'll do this after the current scan is complete to avoid modifying the array during iteration
+        // First, remove ALL router entries to avoid duplicates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.devices = self.devices.filter { device in
-                if device.type == .router && device.ipAddress != gatewayIP {
-                    DebugLogger.shared.debug("Removing duplicate router at \(device.ipAddress)")
-                    return false
-                }
-                return true
-            }
+            self.devices.removeAll { $0.type == .router }
+            
+            // Then add the single router with the correct information
+            self.addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: routerMAC, type: .router)
+            DebugLogger.shared.info("Added router at \(gatewayIP) with MAC \(routerMAC)")
         }
         
         // Process all other devices from ARP table

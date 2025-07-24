@@ -14,6 +14,12 @@ struct NetworkMonitorApp: App {
                         Label("Devices", systemImage: "list.bullet")
                     }
                     .tag(0)
+                    .onAppear {
+                        // Start scanning automatically when the app appears
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            networkManager.scanNetwork()
+                        }
+                    }
                 
                 NetworkMapView()
                     .environmentObject(networkManager)
