@@ -156,9 +156,25 @@ class NetworkManager: NSObject, ObservableObject {
         // Find the router MAC address
         var routerMAC = "Unknown"
         let routerIP = "\(subnet).1"
+        
+        // Debug all found devices
+        for device in arpDevices {
+            DebugLogger.shared.debug("ARP device: IP=\(device.ipAddress), MAC=\(device.macAddress)")
+        }
+        
+        // Try to find router by IP
         if let routerDevice = arpDevices.first(where: { $0.ipAddress == routerIP }) {
             routerMAC = routerDevice.macAddress
             DebugLogger.shared.info("Found router MAC address: \(routerMAC)")
+        } else {
+            DebugLogger.shared.warning("Router not found in ARP table at expected IP \(routerIP)")
+            
+            // Try to find the default gateway
+            let gatewayIP = findDefaultGateway()
+            if let gatewayIP = gatewayIP, let gatewayDevice = arpDevices.first(where: { $0.ipAddress == gatewayIP }) {
+                routerMAC = gatewayDevice.macAddress
+                DebugLogger.shared.info("Found router MAC address from gateway: \(routerMAC)")
+            }
         }
         
         // Add router as a default device
@@ -480,19 +496,22 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
     private func inferDeviceTypeFromMAC(_ macAddress: String) -> DeviceType {
         let macLower = macAddress.lowercased()
         
+        // Debug the MAC address we're checking
+        DebugLogger.shared.debug("Inferring device type from MAC: \(macLower)")
+        
         // Common MAC prefixes for device types
-        let applePrefixes = ["a8:66:7f", "a8:5c:2c", "a8:88:08", "a8:be:27", "a8:20:66", "a8:5b:78", 
-                            "ac:bc:32", "ac:29:3a", "ac:61:ea", "ac:87:a3", "ac:fd:ec", "ac:bc:b5"]
-        let samsungPrefixes = ["b0:d0:9c", "b0:ec:71", "b0:c4:e7", "b0:72:bf", "b0:47:bf", "b0:34:95", 
-                              "b0:df:3a", "b0:c5:59", "b0:78:f0", "b0:c5:ca", "b0:1f:81"]
-        let routerPrefixes = ["60:83:e7", "c4:04:15", "c4:a8:1d", "c4:e9:84", "c4:71:54", "c4:6e:1f", 
-                             "c4:10:8a", "c4:41:1e", "c4:01:7c", "c4:6a:b7"]
-        let iotPrefixes = ["d0:52:a8", "d0:73:d5", "d0:03:4b", "d0:87:e2", "d0:ff:50", "d0:4f:7e", 
-                          "d0:87:e2", "d0:ff:50", "d0:4f:7e", "d0:87:e2", "d0:ff:50"]
+        let applePrefixes = ["a8:66", "a8:5c", "a8:88", "a8:be", "a8:20", "a8:5b", 
+                            "ac:bc", "ac:29", "ac:61", "ac:87", "ac:fd"]
+        let samsungPrefixes = ["b0:d0", "b0:ec", "b0:c4", "b0:72", "b0:47", "b0:34", 
+                              "b0:df", "b0:c5", "b0:78"]
+        let routerPrefixes = ["60:83", "c4:04", "c4:a8", "c4:e9", "c4:71", "c4:6e", 
+                             "c4:10", "c4:41", "c4:01", "c4:6a"]
+        let iotPrefixes = ["d0:52", "d0:73", "d0:03", "d0:87", "d0:ff", "d0:4f"]
         
         // Check for Apple devices
         for prefix in applePrefixes {
             if macLower.hasPrefix(prefix) {
+                DebugLogger.shared.debug("Identified Apple device from MAC prefix: \(prefix)")
                 return .computer // Could be mobile too, but we'll default to computer
             }
         }
@@ -500,20 +519,31 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         // Check for Samsung devices
         for prefix in samsungPrefixes {
             if macLower.hasPrefix(prefix) {
+                DebugLogger.shared.debug("Identified mobile device from MAC prefix: \(prefix)")
                 return .mobile
             }
         }
         
-        // Check for router devices
+        // Check for router devices - only if the IP matches typical router IPs
         for prefix in routerPrefixes {
             if macLower.hasPrefix(prefix) {
-                return .router
+                DebugLogger.shared.debug("Identified potential router from MAC prefix: \(prefix)")
+                // We'll be more cautious about identifying routers
+                // Let's check if this is the default gateway before classifying as router
+                if let gateway = findDefaultGateway(), 
+                   let routerIP = devices.first(where: { $0.macAddress.lowercased() == macLower })?.ipAddress,
+                   gateway == routerIP {
+                    return .router
+                }
+                // Otherwise, default to unknown
+                return .unknown
             }
         }
         
         // Check for IoT devices
         for prefix in iotPrefixes {
             if macLower.hasPrefix(prefix) {
+                DebugLogger.shared.debug("Identified IoT device from MAC prefix: \(prefix)")
                 return .iot
             }
         }
@@ -560,4 +590,31 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         }
         
         return .unknown
+    }
+    private func findDefaultGateway() -> String? {
+        DebugLogger.shared.debug("Attempting to find default gateway...")
+        
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", "netstat -nr | grep default | grep -v ':' | awk '{print $2}'"]
+        
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        
+        do {
+            try task.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                let gateway = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !gateway.isEmpty {
+                    DebugLogger.shared.info("Found default gateway: \(gateway)")
+                    return gateway
+                }
+            }
+            task.waitUntilExit()
+        } catch {
+            DebugLogger.shared.error("Error finding default gateway: \(error.localizedDescription)")
+        }
+        
+        return nil
     }
