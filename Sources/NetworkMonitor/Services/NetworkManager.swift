@@ -171,10 +171,14 @@ class NetworkManager: NSObject, ObservableObject {
             DebugLogger.shared.warning("Router not found in ARP table at gateway IP \(gatewayIP)")
         }
         
-        // First, remove ALL router entries to avoid duplicates
+        // First, remove ALL router entries and multicast addresses to avoid duplicates
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.devices.removeAll { $0.type == .router }
+            
+            // Remove routers and multicast addresses
+            self.devices.removeAll { device in 
+                return device.type == .router || self.isMulticastIP(device.ipAddress)
+            }
             
             // Then add the single router with the correct information
             self.addOrUpdateDevice(name: "Router", ipAddress: gatewayIP, macAddress: routerMAC, type: .router)
