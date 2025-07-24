@@ -535,9 +535,28 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         // Use the vendor information to guess the device type
         if !oui.isEmpty {
             let vendor = MacVendorDatabase.shared.lookupVendor(forMac: oui)
-            if let vendor = vendor {
-                return inferDeviceTypeFromVendor(vendor)
+            if let vendorName = vendor {
+                return inferDeviceTypeFromVendorName(vendorName)
             }
+        }
+        
+        return .unknown
+    }
+    private func inferDeviceTypeFromVendorName(_ vendor: String) -> DeviceType {
+        let vendorLower = vendor.lowercased()
+        
+        if vendorLower.contains("apple") {
+            return .computer
+        } else if vendorLower.contains("samsung") || vendorLower.contains("lg") || 
+                  vendorLower.contains("sony") || vendorLower.contains("htc") {
+            return .mobile
+        } else if vendorLower.contains("cisco") || vendorLower.contains("tp-link") || 
+                  vendorLower.contains("netgear") || vendorLower.contains("d-link") || 
+                  vendorLower.contains("asus") || vendorLower.contains("linksys") {
+            return .router
+        } else if vendorLower.contains("nest") || vendorLower.contains("ring") || 
+                  vendorLower.contains("ecobee") || vendorLower.contains("philips") {
+            return .iot
         }
         
         return .unknown
