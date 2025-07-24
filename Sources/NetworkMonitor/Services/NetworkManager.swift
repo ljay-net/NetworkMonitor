@@ -188,6 +188,12 @@ class NetworkManager: NSObject, ObservableObject {
                 continue
             }
             
+            // Skip multicast addresses (224.0.0.0 to 239.255.255.255)
+            if isMulticastIP(device.ipAddress) {
+                DebugLogger.shared.debug("Skipping multicast address: \(device.ipAddress)")
+                continue
+            }
+            
             // Try to determine device name from IP
             DebugLogger.shared.debug("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
             let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
@@ -640,4 +646,14 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         }
         
         return nil
+    }
+    private func isMulticastIP(_ ipAddress: String) -> Bool {
+        // Parse the first octet of the IP address
+        let components = ipAddress.split(separator: ".")
+        guard components.count >= 1, let firstOctet = Int(components[0]) else {
+            return false
+        }
+        
+        // Multicast IP range is 224.0.0.0 to 239.255.255.255
+        return firstOctet >= 224 && firstOctet <= 239
     }
