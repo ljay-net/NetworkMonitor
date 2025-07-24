@@ -148,19 +148,35 @@ class NetworkManager: NSObject, ObservableObject {
         let subnet = components[0...2].joined(separator: ".")
         DebugLogger.shared.info("Subnet: \(subnet)")
         
-        // Add router as a default device
-        addOrUpdateDevice(name: "Router", ipAddress: "\(subnet).1", macAddress: "Unknown", type: .router)
-        
         // Scan ARP table for devices
         DebugLogger.shared.info("Scanning ARP table...")
         let arpDevices = ARPScanner.scanARPTable()
         DebugLogger.shared.info("ARP scan returned \(arpDevices.count) devices")
         
+        // Find the router MAC address
+        var routerMAC = "Unknown"
+        let routerIP = "\(subnet).1"
+        if let routerDevice = arpDevices.first(where: { $0.ipAddress == routerIP }) {
+            routerMAC = routerDevice.macAddress
+            DebugLogger.shared.info("Found router MAC address: \(routerMAC)")
+        }
+        
+        // Add router as a default device
+        addOrUpdateDevice(name: "Router", ipAddress: routerIP, macAddress: routerMAC, type: .router)
+        
         for device in arpDevices {
+            // Skip the router as we've already added it
+            if device.ipAddress == routerIP {
+                continue
+            }
+            
             // Try to determine device name from IP
             DebugLogger.shared.debug("Processing ARP device: \(device.ipAddress) with MAC: \(device.macAddress)")
             let name = getDeviceNameFromIP(device.ipAddress) ?? "Device at \(device.ipAddress)"
-            addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: .unknown)
+            
+            // Try to determine device type from MAC address
+            let deviceType = inferDeviceTypeFromMAC(device.macAddress)
+            addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: deviceType)
         }
         
         // For devices we already know about, try to ping them
@@ -461,3 +477,66 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
     }
 }
 
+    private func inferDeviceTypeFromMAC(_ macAddress: String) -> DeviceType {
+        let macLower = macAddress.lowercased()
+        
+        // Common MAC prefixes for device types
+        let applePrefixes = ["a8:66:7f", "a8:5c:2c", "a8:88:08", "a8:be:27", "a8:20:66", "a8:5b:78", 
+                            "ac:bc:32", "ac:29:3a", "ac:61:ea", "ac:87:a3", "ac:fd:ec", "ac:bc:b5"]
+        let samsungPrefixes = ["b0:d0:9c", "b0:ec:71", "b0:c4:e7", "b0:72:bf", "b0:47:bf", "b0:34:95", 
+                              "b0:df:3a", "b0:c5:59", "b0:78:f0", "b0:c5:ca", "b0:1f:81"]
+        let routerPrefixes = ["60:83:e7", "c4:04:15", "c4:a8:1d", "c4:e9:84", "c4:71:54", "c4:6e:1f", 
+                             "c4:10:8a", "c4:41:1e", "c4:01:7c", "c4:6a:b7"]
+        let iotPrefixes = ["d0:52:a8", "d0:73:d5", "d0:03:4b", "d0:87:e2", "d0:ff:50", "d0:4f:7e", 
+                          "d0:87:e2", "d0:ff:50", "d0:4f:7e", "d0:87:e2", "d0:ff:50"]
+        
+        // Check for Apple devices
+        for prefix in applePrefixes {
+            if macLower.hasPrefix(prefix) {
+                return .computer // Could be mobile too, but we'll default to computer
+            }
+        }
+        
+        // Check for Samsung devices
+        for prefix in samsungPrefixes {
+            if macLower.hasPrefix(prefix) {
+                return .mobile
+            }
+        }
+        
+        // Check for router devices
+        for prefix in routerPrefixes {
+            if macLower.hasPrefix(prefix) {
+                return .router
+            }
+        }
+        
+        // Check for IoT devices
+        for prefix in iotPrefixes {
+            if macLower.hasPrefix(prefix) {
+                return .iot
+            }
+        }
+        
+        // If the MAC address contains ":" or "-", extract the OUI (first 3 bytes)
+        var oui = ""
+        if macLower.contains(":") {
+            let components = macLower.components(separatedBy: ":")
+            if components.count >= 3 {
+                oui = components[0...2].joined(separator: ":")
+            }
+        } else if macLower.contains("-") {
+            let components = macLower.components(separatedBy: "-")
+            if components.count >= 3 {
+                oui = components[0...2].joined(separator: "-")
+            }
+        }
+        
+        // Use the vendor information to guess the device type
+        if !oui.isEmpty {
+            let vendor = MacVendorDatabase.shared.lookupVendor(forMac: oui)
+            return inferDeviceTypeFromVendor(vendor)
+        }
+        
+        return .unknown
+    }
