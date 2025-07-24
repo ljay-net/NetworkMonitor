@@ -6,6 +6,26 @@ class ARPScanner {
         
         DebugLogger.shared.info("Starting ARP table scan...")
         
+        // First, run a simple command to show the ARP command being used
+        let debugTask = Process()
+        debugTask.launchPath = "/bin/bash"
+        debugTask.arguments = ["-c", "which arp"]
+        
+        let debugPipe = Pipe()
+        debugTask.standardOutput = debugPipe
+        
+        do {
+            try debugTask.run()
+            let debugData = debugPipe.fileHandleForReading.readDataToEndOfFile()
+            if let debugOutput = String(data: debugData, encoding: .utf8) {
+                DebugLogger.shared.debug("ARP command path: \(debugOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
+            debugTask.waitUntilExit()
+        } catch {
+            DebugLogger.shared.warning("Could not determine arp command path: \(error.localizedDescription)")
+        }
+        
+        // Now run the actual ARP command
         let task = Process()
         task.launchPath = "/usr/sbin/arp"
         task.arguments = ["-a"]
@@ -38,6 +58,7 @@ class ARPScanner {
         
         DebugLogger.shared.debug("Parsing ARP output...")
         
+        // Example line: ? (10.13.13.1) at 60:83:e7:3b:e0:8d on en1 ifscope [ethernet]
         let lines = output.components(separatedBy: .newlines)
         for line in lines {
             // Skip empty lines
@@ -45,29 +66,39 @@ class ARPScanner {
             
             DebugLogger.shared.debug("Processing ARP line: \(line)")
             
-            // Extract IP address - it's usually in parentheses like (10.13.13.1)
-            guard let ipRange = line.range(of: "\\([0-9\\.]+\\)") else {
+            // Simple parsing approach - split by spaces and extract components
+            let components = line.components(separatedBy: " ")
+            
+            // Need at least 4 components for a valid entry
+            guard components.count >= 4 else {
+                DebugLogger.shared.debug("Line has too few components")
+                continue
+            }
+            
+            // Find the IP address component (in parentheses)
+            var ipAddress = ""
+            for component in components {
+                if component.hasPrefix("(") && component.hasSuffix(")") {
+                    ipAddress = component.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
+                    break
+                }
+            }
+            
+            if ipAddress.isEmpty {
                 DebugLogger.shared.debug("No IP address found in line")
                 continue
             }
             
-            let ipWithParens = String(line[ipRange])
-            let ipAddress = ipWithParens.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
-            
-            // Extract MAC address - it's usually after "at" and before "on"
-            guard let atRange = line.range(of: "at ") else {
-                DebugLogger.shared.debug("No 'at' marker found for MAC address")
-                continue
+            // Find the MAC address (after "at")
+            var macAddress = ""
+            if let atIndex = components.firstIndex(of: "at"), atIndex + 1 < components.count {
+                macAddress = components[atIndex + 1]
             }
             
-            let afterAt = String(line[atRange.upperBound...])
-            let macComponents = afterAt.components(separatedBy: " ")
-            guard !macComponents.isEmpty else {
-                DebugLogger.shared.debug("No MAC address found after 'at'")
+            if macAddress.isEmpty {
+                DebugLogger.shared.debug("No MAC address found in line")
                 continue
             }
-            
-            let macAddress = macComponents[0]
             
             // Skip incomplete entries and broadcast addresses
             if macAddress != "(incomplete)" && !macAddress.lowercased().contains("ff:ff:ff:ff:ff:ff") {
