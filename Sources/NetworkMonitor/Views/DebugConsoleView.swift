@@ -101,6 +101,3 @@ struct DebugConsoleView: View {
         }
     }
 }
-    init(isVisible: Binding<Bool>) {
-        self._isVisible = isVisible
-    }
