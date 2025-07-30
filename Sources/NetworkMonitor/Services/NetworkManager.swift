@@ -177,7 +177,7 @@ class NetworkManager: NSObject, ObservableObject {
             
             // Remove routers and multicast addresses
             self.devices.removeAll { device in 
-                return device.type == .router || self.isMulticastIP(device.ipAddress)
+                return device.type == .router || NetworkManager.isMulticastIP(device.ipAddress)
             }
             
             // Then add the single router with the correct information
@@ -193,7 +193,7 @@ class NetworkManager: NSObject, ObservableObject {
             }
             
             // Skip multicast addresses (224.0.0.0 to 239.255.255.255)
-            if isMulticastIP(device.ipAddress) {
+            if NetworkManager.isMulticastIP(device.ipAddress) {
                 DebugLogger.shared.debug("Skipping multicast address: \(device.ipAddress)")
                 continue
             }
@@ -651,7 +651,8 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         
         return nil
     }
-    private func isMulticastIP(_ ipAddress: String) -> Bool {
+    // Helper function to check if an IP address is in the multicast range
+    private static func isMulticastIP(_ ipAddress: String) -> Bool {
         // Parse the first octet of the IP address
         let components = ipAddress.split(separator: ".")
         guard components.count >= 1, let firstOctet = Int(components[0]) else {
