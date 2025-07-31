@@ -22,7 +22,8 @@ A privacy-focused macOS application that maps your local network, displays all c
 
 1. Open Terminal and navigate to the project directory:
    ```
-   cd ~/NetworkMonitor
+<<<<<<< HEAD
+   cd /Users/jay/NetworkMonitor
    ```
 
 2. Build the project using Swift Package Manager:

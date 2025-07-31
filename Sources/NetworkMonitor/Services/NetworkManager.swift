@@ -523,8 +523,7 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
             discoveredServices.remove(at: index)
         }
     }
-}
-
+    
     private func inferDeviceTypeFromMAC(_ macAddress: String) -> DeviceType {
         let macLower = macAddress.lowercased()
         
@@ -605,6 +604,7 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         
         return .unknown
     }
+    
     private func inferDeviceTypeFromVendorName(_ vendor: String) -> DeviceType {
         let vendorLower = vendor.lowercased()
         
@@ -624,6 +624,7 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         
         return .unknown
     }
+    
     private func findDefaultGateway() -> String? {
         DebugLogger.shared.debug("Attempting to find default gateway...")
         
@@ -651,6 +652,7 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         
         return nil
     }
+    
     // Helper function to check if an IP address is in the multicast range
     private static func isMulticastIP(_ ipAddress: String) -> Bool {
         // Parse the first octet of the IP address
@@ -662,3 +664,4 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
         // Multicast IP range is 224.0.0.0 to 239.255.255.255
         return firstOctet >= 224 && firstOctet <= 239
     }
+}
