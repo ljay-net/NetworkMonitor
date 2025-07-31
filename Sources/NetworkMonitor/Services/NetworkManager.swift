@@ -18,6 +18,39 @@ class NetworkManager: NSObject, ObservableObject {
         super.init()
         loadSavedDevices()
         determineLocalIP()
+        
+        // Set reference in MacVendorDatabase for direct updates
+        MacVendorDatabase.shared.networkManager = self
+    }
+    
+    func updateDevicesWithVendor(oui: String, vendor: String) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            DebugLogger.shared.info("Updating devices with vendor data for OUI \(oui): \(vendor)")
+            
+            var hasUpdates = false
+            
+            for i in 0..<self.devices.count {
+                let deviceOUI = MacVendorDatabase.shared.extractOUI(from: self.devices[i].macAddress)
+                if deviceOUI == oui {
+                    self.devices[i].vendor = vendor
+                    
+                    // Update device type if it was unknown
+                    if self.devices[i].type == .unknown {
+                        self.devices[i].type = self.inferDeviceTypeFromVendor(vendor)
+                    }
+                    
+                    DebugLogger.shared.info("Updated device \(self.devices[i].name) with vendor: \(vendor)")
+                    hasUpdates = true
+                }
+            }
+            
+            if hasUpdates {
+                self.saveDevices()
+                DebugLogger.shared.info("Updated vendor data (detail view will show correct info)")
+            }
+        }
     }
     
     func scanNetwork() {
@@ -206,23 +239,15 @@ class NetworkManager: NSObject, ObservableObject {
             // Default to unknown unless we have strong evidence
             var deviceType = DeviceType.unknown
             
-            // Check if this is the local device
+            // Only classify local device as computer and gateway as router
             if device.ipAddress == localIP {
                 deviceType = .computer
                 DebugLogger.shared.debug("Identified local computer at \(device.ipAddress)")
-            } else {
-                // Try to determine device type from MAC address
-                // But be more selective about router classification
-                let inferredType = inferDeviceTypeFromMAC(device.macAddress)
-                
-                // Only accept router type if it's actually the gateway
-                if inferredType == .router && device.ipAddress != gatewayIP {
-                    deviceType = .unknown
-                    DebugLogger.shared.debug("Reclassified device from router to unknown: \(device.ipAddress)")
-                } else {
-                    deviceType = inferredType
-                }
+            } else if device.ipAddress == gatewayIP {
+                deviceType = .router
+                DebugLogger.shared.debug("Identified router at gateway: \(device.ipAddress)")
             }
+            // All other devices remain unknown
             
             addOrUpdateDevice(name: name, ipAddress: device.ipAddress, macAddress: device.macAddress, type: deviceType)
         }
@@ -330,15 +355,19 @@ class NetworkManager: NSObject, ObservableObject {
                 devices[index].name = name
             }
             
-            // Vendor information only updated manually by user
+            // Update vendor for online devices
+            if devices[index].vendor == nil && devices[index].isOnline {
+                devices[index].vendor = MacVendorDatabase.shared.lookupVendor(forMac: macAddress, isOnline: true)
+            }
             
             // Try to determine device type from vendor if it's unknown
             if devices[index].type == .unknown {
                 devices[index].type = inferDeviceTypeFromVendor(devices[index].vendor)
             }
         } else {
-            // No automatic vendor lookup - user must manually refresh
-            let vendor: String? = nil
+            // Lookup vendor for online devices - this will queue API call if needed
+            let vendor = MacVendorDatabase.shared.lookupVendor(forMac: macAddress, isOnline: true)
+            DebugLogger.shared.debug("Creating new device with vendor: \(vendor ?? "nil")")
             
             // Infer device type from vendor if needed
             let inferredType = type == .unknown ? inferDeviceTypeFromVendor(vendor) : type
@@ -479,10 +508,9 @@ class NetworkManager: NSObject, ObservableObject {
     }
     
     private func loadSavedDevices() {
-        // Clear all saved devices to remove cached vendor errors
-        devices = []
-        deviceStore.saveDevices([])
-        DebugLogger.shared.info("Cleared all saved devices to remove cached vendor data")
+        if let savedDevices = deviceStore.loadDevices() {
+            devices = savedDevices
+        }
     }
     
     private func saveDevices() {
@@ -559,77 +587,8 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
     }
     
     private func inferDeviceTypeFromMAC(_ macAddress: String) -> DeviceType {
-        let macLower = macAddress.lowercased()
-        
-        // Debug the MAC address we're checking
-        DebugLogger.shared.debug("Inferring device type from MAC: \(macLower)")
-        
-        // Common MAC prefixes for device types
-        let applePrefixes = ["a8:66", "a8:5c", "a8:88", "a8:be", "a8:20", "a8:5b", 
-                            "ac:bc", "ac:29", "ac:61", "ac:87", "ac:fd"]
-        let samsungPrefixes = ["b0:d0", "b0:ec", "b0:c4", "b0:72", "b0:47", "b0:34", 
-                              "b0:df", "b0:c5", "b0:78"]
-        let routerPrefixes = ["60:83", "c4:04", "c4:a8", "c4:e9", "c4:71", "c4:6e", 
-                             "c4:10", "c4:41", "c4:01", "c4:6a"]
-        let iotPrefixes = ["d0:52", "d0:73", "d0:03", "d0:87", "d0:ff", "d0:4f"]
-        
-        // Check for Apple devices
-        for prefix in applePrefixes {
-            if macLower.hasPrefix(prefix) {
-                DebugLogger.shared.debug("Identified Apple device from MAC prefix: \(prefix)")
-                return .computer // Could be mobile too, but we'll default to computer
-            }
-        }
-        
-        // Check for Samsung devices
-        for prefix in samsungPrefixes {
-            if macLower.hasPrefix(prefix) {
-                DebugLogger.shared.debug("Identified mobile device from MAC prefix: \(prefix)")
-                return .mobile
-            }
-        }
-        
-        // Check for router devices - only if the IP matches typical router IPs
-        for prefix in routerPrefixes {
-            if macLower.hasPrefix(prefix) {
-                DebugLogger.shared.debug("Identified potential router from MAC prefix: \(prefix)")
-                // We'll be more cautious about identifying routers
-                // Just identify as router based on MAC prefix
-                // We'll be more selective about this in the main device processing
-                DebugLogger.shared.debug("Identified router from MAC prefix: \(prefix)")
-                return .router
-                /* Removed gateway check as we don't have access to devices list here
-                if let gateway = findDefaultGateway(), 
-                   gateway == someIP {
-                */
-                // This code is now unreachable due to the fix above
-            }
-        }
-        
-        // Check for IoT devices
-        for prefix in iotPrefixes {
-            if macLower.hasPrefix(prefix) {
-                DebugLogger.shared.debug("Identified IoT device from MAC prefix: \(prefix)")
-                return .iot
-            }
-        }
-        
-        // If the MAC address contains ":" or "-", extract the OUI (first 3 bytes)
-        var oui = ""
-        if macLower.contains(":") {
-            let components = macLower.components(separatedBy: ":")
-            if components.count >= 3 {
-                oui = components[0...2].joined(separator: ":")
-            }
-        } else if macLower.contains("-") {
-            let components = macLower.components(separatedBy: "-")
-            if components.count >= 3 {
-                oui = components[0...2].joined(separator: "-")
-            }
-        }
-        
-        // Vendor lookup disabled - cannot infer device type from vendor
-        
+        // Always return unknown - device type will be determined by vendor info when available
+        DebugLogger.shared.debug("MAC-based classification disabled - defaulting to unknown for \(macAddress)")
         return .unknown
     }
     

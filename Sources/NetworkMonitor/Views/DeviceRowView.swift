@@ -12,20 +12,9 @@ struct DeviceRowView: View {
             VStack(alignment: .leading) {
                 Text(device.name)
                     .font(.headline)
-                HStack {
-                    Text(device.ipAddress)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    if let vendor = device.vendor {
-                        Text("•")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(vendor)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                Text(device.ipAddress)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
             
             Spacer()

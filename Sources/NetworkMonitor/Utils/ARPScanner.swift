@@ -102,13 +102,26 @@ class ARPScanner {
             
             // Skip incomplete entries and broadcast addresses
             if macAddress != "(incomplete)" && !macAddress.lowercased().contains("ff:ff:ff:ff:ff:ff") {
-                DebugLogger.shared.info("Found device: \(ipAddress) with MAC: \(macAddress)")
-                results.append((ipAddress: ipAddress, macAddress: macAddress))
+                // Normalize MAC address to ensure proper formatting with leading zeros
+                let normalizedMAC = normalizeMACAddress(macAddress)
+                DebugLogger.shared.info("Found device: \(ipAddress) with MAC: \(normalizedMAC) (original: \(macAddress))")
+                results.append((ipAddress: ipAddress, macAddress: normalizedMAC))
             } else {
                 DebugLogger.shared.debug("Skipping incomplete or broadcast MAC: \(macAddress)")
             }
         }
         
         return results
+    }
+    
+    private static func normalizeMACAddress(_ macAddress: String) -> String {
+        // Split by colon and ensure each part is 2 characters with leading zero if needed
+        let parts = macAddress.split(separator: ":").map { part in
+            let str = String(part).lowercased()
+            return str.count == 1 ? "0" + str : str
+        }
+        
+        // Rejoin with colons
+        return parts.joined(separator: ":")
     }
 }

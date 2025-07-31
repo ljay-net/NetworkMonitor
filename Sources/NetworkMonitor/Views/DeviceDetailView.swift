@@ -96,9 +96,7 @@ struct DeviceDetailView: View {
                     }
                     
                     DetailRow(label: "MAC Address", value: device.macAddress)
-                    if let vendor = device.vendor {
-                        DetailRow(label: "Vendor", value: vendor)
-                    }
+                    DetailRow(label: "Vendor", value: device.vendor ?? "Loading...")
                     DetailRow(label: "First Seen", value: device.firstSeen.formatted())
                     DetailRow(label: "Last Seen", value: device.lastSeen.formatted())
                 }
