@@ -38,6 +38,10 @@ struct NetworkMonitorApp: App {
                 }
                 .keyboardShortcut("R", modifiers: [.command])
                 
+                Button("Refresh Vendor Database") {
+                    networkManager.refreshVendorDatabase()
+                }
+                
                 Divider()
                 
                 Button("Show Devices List") {

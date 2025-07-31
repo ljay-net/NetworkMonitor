@@ -369,21 +369,37 @@ class NetworkManager: NSObject, ObservableObject {
         
         let vendorLower = vendor.lowercased()
         
-        if vendorLower.contains("apple") {
-            // Could be a Mac or iOS device, but we'll default to computer
+        // Computer/Server vendors
+        if vendorLower.contains("apple") || vendorLower.contains("intel") || 
+           vendorLower.contains("dell") || vendorLower.contains("hp") || 
+           vendorLower.contains("lenovo") || vendorLower.contains("microsoft") || 
+           vendorLower.contains("vmware") || vendorLower.contains("parallels") {
             return .computer
-        } else if vendorLower.contains("samsung") || vendorLower.contains("lg") || 
-                  vendorLower.contains("sony") || vendorLower.contains("htc") {
-            // Likely a mobile device or smart TV
+        }
+        
+        // Mobile device vendors
+        if vendorLower.contains("samsung") || vendorLower.contains("lg") || 
+           vendorLower.contains("sony") || vendorLower.contains("htc") || 
+           vendorLower.contains("huawei") || vendorLower.contains("xiaomi") || 
+           vendorLower.contains("oppo") || vendorLower.contains("oneplus") {
             return .mobile
-        } else if vendorLower.contains("cisco") || vendorLower.contains("tp-link") || 
-                  vendorLower.contains("netgear") || vendorLower.contains("d-link") || 
-                  vendorLower.contains("asus") || vendorLower.contains("linksys") {
-            // Likely a router or network device
+        }
+        
+        // Router/Network vendors
+        if vendorLower.contains("cisco") || vendorLower.contains("tp-link") || 
+           vendorLower.contains("netgear") || vendorLower.contains("d-link") || 
+           vendorLower.contains("asus") || vendorLower.contains("linksys") || 
+           vendorLower.contains("ubiquiti") || vendorLower.contains("mikrotik") || 
+           vendorLower.contains("juniper") || vendorLower.contains("aruba") {
             return .router
-        } else if vendorLower.contains("nest") || vendorLower.contains("ring") || 
-                  vendorLower.contains("ecobee") || vendorLower.contains("philips") {
-            // Likely an IoT device
+        }
+        
+        // IoT device vendors
+        if vendorLower.contains("nest") || vendorLower.contains("ring") || 
+           vendorLower.contains("ecobee") || vendorLower.contains("philips") || 
+           vendorLower.contains("amazon") || vendorLower.contains("google") || 
+           vendorLower.contains("sonos") || vendorLower.contains("roku") || 
+           vendorLower.contains("chromecast") || vendorLower.contains("alexa") {
             return .iot
         }
         
@@ -442,6 +458,25 @@ class NetworkManager: NSObject, ObservableObject {
     
     func clearHistory() {
         devices.removeAll()
+        saveDevices()
+    }
+    
+    func refreshVendorDatabase() {
+        MacVendorDatabase.shared.refreshCache()
+        
+        // Re-lookup vendors for existing devices
+        for i in 0..<devices.count {
+            let newVendor = MacVendorDatabase.shared.lookupVendor(forMac: devices[i].macAddress)
+            if let vendor = newVendor, vendor != devices[i].vendor {
+                devices[i].vendor = vendor
+                
+                // Re-classify device type if it was unknown
+                if devices[i].type == .unknown {
+                    devices[i].type = inferDeviceTypeFromVendor(vendor)
+                }
+            }
+        }
+        
         saveDevices()
     }
     
