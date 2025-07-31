@@ -59,6 +59,10 @@ struct NetworkMonitorApp: App {
                 Button("Clear Device History") {
                     networkManager.clearHistory()
                 }
+                
+                Button("Reset All Data") {
+                    networkManager.resetAllData()
+                }
             }
         }
     }

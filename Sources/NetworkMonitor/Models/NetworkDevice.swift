@@ -36,7 +36,7 @@ struct NetworkDevice: Identifiable, Codable, Equatable, Hashable {
         self.lastSeen = Date()
         self.tags = tags
         self.notes = notes
-        self.vendor = vendor ?? MacVendorDatabase.shared.lookupVendor(forMac: macAddress)
+        self.vendor = vendor // No automatic vendor lookup
     }
     
     static func == (lhs: NetworkDevice, rhs: NetworkDevice) -> Bool {

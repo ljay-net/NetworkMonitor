@@ -330,18 +330,15 @@ class NetworkManager: NSObject, ObservableObject {
                 devices[index].name = name
             }
             
-            // Update vendor information if it's missing
-            if devices[index].vendor == nil {
-                devices[index].vendor = MacVendorDatabase.shared.lookupVendor(forMac: macAddress)
-            }
+            // Vendor information only updated manually by user
             
             // Try to determine device type from vendor if it's unknown
             if devices[index].type == .unknown {
                 devices[index].type = inferDeviceTypeFromVendor(devices[index].vendor)
             }
         } else {
-            // Look up vendor information
-            let vendor = MacVendorDatabase.shared.lookupVendor(forMac: macAddress)
+            // No automatic vendor lookup - user must manually refresh
+            let vendor: String? = nil
             
             // Infer device type from vendor if needed
             let inferredType = type == .unknown ? inferDeviceTypeFromVendor(vendor) : type
@@ -464,26 +461,28 @@ class NetworkManager: NSObject, ObservableObject {
     func refreshVendorDatabase() {
         MacVendorDatabase.shared.refreshCache()
         
-        // Re-lookup vendors for existing devices
+        // Clear vendor info from all existing devices
         for i in 0..<devices.count {
-            let newVendor = MacVendorDatabase.shared.lookupVendor(forMac: devices[i].macAddress)
-            if let vendor = newVendor, vendor != devices[i].vendor {
-                devices[i].vendor = vendor
-                
-                // Re-classify device type if it was unknown
-                if devices[i].type == .unknown {
-                    devices[i].type = inferDeviceTypeFromVendor(vendor)
-                }
-            }
+            devices[i].vendor = nil
         }
+        
+        DebugLogger.shared.info("Cleared vendor info from all devices")
         
         saveDevices()
     }
     
+    func resetAllData() {
+        devices.removeAll()
+        saveDevices()
+        MacVendorDatabase.shared.refreshCache()
+        DebugLogger.shared.info("Reset all app data")
+    }
+    
     private func loadSavedDevices() {
-        if let savedDevices = deviceStore.loadDevices() {
-            devices = savedDevices
-        }
+        // Clear all saved devices to remove cached vendor errors
+        devices = []
+        deviceStore.saveDevices([])
+        DebugLogger.shared.info("Cleared all saved devices to remove cached vendor data")
     }
     
     private func saveDevices() {
@@ -629,13 +628,7 @@ extension NetworkManager: NetServiceBrowserDelegate, NetServiceDelegate {
             }
         }
         
-        // Use the vendor information to guess the device type
-        if !oui.isEmpty {
-            let vendor = MacVendorDatabase.shared.lookupVendor(forMac: oui)
-            if let vendorName = vendor {
-                return inferDeviceTypeFromVendorName(vendorName)
-            }
-        }
+        // Vendor lookup disabled - cannot infer device type from vendor
         
         return .unknown
     }
