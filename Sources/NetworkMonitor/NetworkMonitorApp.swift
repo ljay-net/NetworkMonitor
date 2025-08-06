@@ -28,6 +28,9 @@ struct NetworkMonitorApp: App {
                     }
                     .tag(1)
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+                NSApplication.shared.terminate(nil)
+            }
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
