@@ -12,7 +12,7 @@ BUILD_DIR = build
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
-TARGET = $(BUILD_DIR)/AppleSiliconDemo
+TARGET = $(BUILD_DIR)/NetworkMonitor
 
 .PHONY: all clean
 
