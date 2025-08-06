@@ -11,4 +11,4 @@ make
 
 echo ""
 echo "Build completed successfully!"
-echo "Run the application with: ./build/AppleSiliconDemo"
+echo "Run the application with: ./build/NetworkMonitor"
